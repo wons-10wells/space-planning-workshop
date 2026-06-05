@@ -17,6 +17,7 @@ npm run dev
 - 시작 방식 선택: 기존 자료 입력 또는 직접 작성
 - 기획서 PDF/브랜드 이미지 업로드 흐름
 - 자료 메모 기반 요약 초안 생성
+- Gemini API 기반 초안 생성
 - 참가자명/팀명 입력
 - 프로젝트 정보 입력
 - 공간 정보 입력
@@ -78,3 +79,16 @@ GOOGLE_SHEETS_WEBAPP_URL=복사한_Web_App_URL
 ```
 
 8. Vercel에서 다시 배포하면 `구글시트에 제출하기` 버튼이 작동합니다.
+
+## Gemini 초안 생성 설정
+
+1. [Google AI Studio](https://aistudio.google.com/)에서 API 키를 만듭니다.
+2. Vercel 프로젝트 설정에서 `Settings` → `Environment Variables`에 아래 값을 추가합니다.
+
+```text
+GEMINI_API_KEY=복사한_Gemini_API_Key
+```
+
+3. Vercel에서 다시 배포하면 `Gemini 무료 티어로 초안 만들기` 버튼이 작동합니다.
+
+현재 버전은 PDF 본문을 자동 추출하지 않고, 사용자가 `자료 메모 요약`에 붙여넣은 내용을 바탕으로 워크시트 초안을 만듭니다.

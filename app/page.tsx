@@ -212,6 +212,29 @@ const requiredFields: Array<{ key: FieldKey; label: string; reason: string }> = 
   { key: "constraints", label: "제약 조건", reason: "안전, 공사 범위, 일정 리스크를 프롬프트에 반영해야 합니다." },
 ];
 
+const geminiDraftFields: FieldKey[] = [
+  "organizationName",
+  "organizationType",
+  "users",
+  "region",
+  "participantName",
+  "teamName",
+  "projectName",
+  "goal",
+  "keywords",
+  "mood",
+  "spaceType",
+  "size",
+  "existingCondition",
+  "mustHave",
+  "activities",
+  "budget",
+  "productionMethod",
+  "constraints",
+  "maintenance",
+  "brandColorText",
+];
+
 const materialDraft: Partial<FormState> = {
   organizationType: "자료 기반으로 확인 필요",
   users: "자료에서 언급된 주요 이용자 확인 필요",
@@ -369,6 +392,8 @@ export default function Home() {
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState("");
   const [draftMessage, setDraftMessage] = useState("");
+  const [geminiState, setGeminiState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [geminiMessage, setGeminiMessage] = useState("");
   const [imageToolMessage, setImageToolMessage] = useState("");
 
   const conceptPrompt = useMemo(() => buildConceptPrompt(form), [form]);
@@ -418,6 +443,55 @@ export default function Home() {
         ? "자료 메모를 바탕으로 초안을 채웠습니다. 아래 워크시트에서 내용을 확인하고 수정해 주세요."
         : "파일명만 반영했습니다. 현재 버전은 PDF 내용을 자동 분석하지 않으므로 핵심 내용을 직접 붙여넣으면 초안이 더 구체화됩니다.",
     );
+  }
+
+  async function applyGeminiDraft() {
+    setGeminiState("loading");
+    setGeminiMessage("Gemini가 자료 메모를 읽고 워크시트 초안을 만드는 중입니다.");
+
+    try {
+      const response = await fetch("/api/gemini-draft", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          form,
+          materialText,
+          fileNames,
+        }),
+      });
+      const result = (await response.json()) as {
+        ok?: boolean;
+        draft?: Partial<FormState>;
+        message?: string;
+      };
+
+      if (!response.ok || !result.ok || !result.draft) {
+        throw new Error(result.message || "Gemini 초안 생성 중 문제가 발생했습니다.");
+      }
+
+      setForm((current) => {
+        const next = { ...current };
+        geminiDraftFields.forEach((key) => {
+          const value = result.draft?.[key];
+          if (typeof value === "string" && value.trim()) {
+            next[key] = value;
+          }
+        });
+        return next;
+      });
+      setGeminiState("success");
+      setGeminiMessage("Gemini 초안을 반영했습니다. 아래 워크시트에서 사실관계와 표현을 확인해 주세요.");
+      setDraftMessage("");
+    } catch (error) {
+      setGeminiState("error");
+      setGeminiMessage(
+        error instanceof Error
+          ? error.message
+          : "Gemini 초안 생성에 실패했습니다. Vercel 환경변수 GEMINI_API_KEY를 확인해 주세요.",
+      );
+    }
   }
 
   async function handleSubmit() {
@@ -601,17 +675,44 @@ export default function Home() {
                 <div className="rounded-md bg-fog p-3 text-sm leading-6 text-graphite">
                   <pre className="whitespace-pre-wrap font-sans">{materialSummary}</pre>
                 </div>
-                <button
-                  type="button"
-                  onClick={applyMaterialDraft}
-                  className="inline-flex h-10 w-fit items-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-graphite focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  요약 초안 만들기
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={applyMaterialDraft}
+                    className="inline-flex h-10 w-fit items-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-graphite focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    기본 초안 만들기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyGeminiDraft}
+                    disabled={geminiState === "loading"}
+                    className="inline-flex h-10 w-fit items-center gap-2 rounded-md bg-moss px-4 text-sm font-semibold text-white transition hover:bg-moss/90 focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    {geminiState === "loading" ? "Gemini 생성 중" : "Gemini 무료 티어로 초안 만들기"}
+                  </button>
+                </div>
+                <p className="rounded-md bg-fog p-3 text-sm leading-6 text-graphite">
+                  Gemini 버튼은 Vercel 환경변수에 API 키를 설정한 뒤 배포 링크에서 작동합니다. PDF 본문 자동 추출은 아직 아니며, 자료 메모 요약에 붙여넣은 내용을 바탕으로 초안을 만듭니다.
+                </p>
                 {draftMessage ? (
                   <p className="rounded-md border border-coral/20 bg-coral/5 p-3 text-sm leading-6 text-graphite">
                     {draftMessage}
+                  </p>
+                ) : null}
+                {geminiMessage ? (
+                  <p
+                    className={`rounded-md p-3 text-sm leading-6 ${
+                      geminiState === "success"
+                        ? "bg-fog text-moss"
+                        : geminiState === "error"
+                          ? "border border-coral/20 bg-coral/5 text-graphite"
+                          : "bg-linen text-graphite"
+                    }`}
+                  >
+                    {geminiMessage}
                   </p>
                 ) : null}
               </div>
