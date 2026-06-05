@@ -466,8 +466,13 @@ export default function Home() {
               기획서를 넣으면 공간기획을 해드려요
             </h1>
             <p className="mt-3 max-w-3xl text-base leading-7 text-graphite">
-              참가자별로 기관, 공간, 예산 조건을 입력하면 누락 정보와 현실성 체크를 확인하고,
-              제출용 결과와 이미지 생성 요청문을 복사해 AI에 입력해 볼 수 있습니다. 그러면 공간이미지가 나옵니다.
+              참가자별로 기관, 공간, 예산 조건을 입력하시고,
+              <br />
+              누락 정보와 현실성 체크를 확인합니다.
+              <br />
+              생성된 요청문을 복사해 AI에 입력하면,
+              <br />
+              공간 컨셉 이미지가 나옵니다.
             </p>
           </div>
           <div className="grid content-end gap-2 rounded-md border border-ink/10 bg-white p-4 shadow-panel">
