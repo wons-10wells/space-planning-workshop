@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   Layers3,
   PencilLine,
+  Send,
   Sparkles,
   UploadCloud,
   WalletCards,
@@ -364,6 +365,8 @@ export default function Home() {
   const [startMode, setStartMode] = useState<StartMode>(null);
   const [materialText, setMaterialText] = useState("");
   const [fileNames, setFileNames] = useState<string[]>([]);
+  const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
+  const [submitMessage, setSubmitMessage] = useState("");
 
   const conceptPrompt = useMemo(() => buildConceptPrompt(form), [form]);
   const imagePrompt = useMemo(() => buildImagePrompt(form), [form]);
@@ -405,6 +408,41 @@ export default function Home() {
       mood: current.mood || "자료의 색감과 브랜드 톤을 반영한 분위기",
       style: current.style,
     }));
+  }
+
+  async function handleSubmit() {
+    setSubmitState("submitting");
+    setSubmitMessage("");
+
+    try {
+      const response = await fetch("/api/submit", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          form,
+          conceptPrompt,
+          imagePrompt,
+          submissionText,
+        }),
+      });
+      const result = (await response.json()) as { ok?: boolean; message?: string };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.message || "제출 중 문제가 발생했습니다.");
+      }
+
+      setSubmitState("success");
+      setSubmitMessage("제출이 완료되었습니다. 구글시트에서 새 행을 확인해 주세요.");
+    } catch (error) {
+      setSubmitState("error");
+      setSubmitMessage(
+        error instanceof Error
+          ? error.message
+          : "제출 설정을 확인해 주세요. Google Apps Script URL이 필요합니다.",
+      );
+    }
   }
 
   return (
@@ -742,6 +780,32 @@ export default function Home() {
             <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-linen p-3 text-sm leading-6 text-graphite">
               {submissionText}
             </pre>
+            <div className="mt-3 grid gap-2">
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={submitState === "submitting"}
+                className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-coral px-4 text-sm font-semibold text-white transition hover:bg-coral/90 focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Send className="h-4 w-4" />
+                {submitState === "submitting" ? "제출 중" : "구글시트에 제출하기"}
+              </button>
+              {submitMessage ? (
+                <p
+                  className={`rounded-md p-3 text-sm leading-6 ${
+                    submitState === "success"
+                      ? "bg-fog text-moss"
+                      : "border border-coral/20 bg-coral/5 text-graphite"
+                  }`}
+                >
+                  {submitMessage}
+                </p>
+              ) : (
+                <p className="rounded-md bg-fog p-3 text-sm leading-6 text-graphite">
+                  제출 기능은 Vercel 환경변수에 Google Apps Script Web App URL을 설정하면 작동합니다.
+                </p>
+              )}
+            </div>
           </section>
         </aside>
       </section>
