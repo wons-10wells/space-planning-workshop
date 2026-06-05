@@ -329,7 +329,7 @@ function buildMaterialSummary(materialText: string, fileNames: string[]) {
     : "입력 자료: 아직 파일이 선택되지 않았습니다.";
   const textSummary = materialText.trim()
     ? `자료 메모 요약: ${materialText.trim().slice(0, 260)}${materialText.trim().length > 260 ? "..." : ""}`
-    : "자료 메모 요약: 현재 버전은 파일 내용을 자동으로 읽지 않습니다. 핵심 문장이나 브랜드 설명을 직접 붙여넣어 주세요.";
+    : "자료 메모 요약: 기획서의 핵심 문장, 브랜드 설명, 요구사항을 직접 요약해 주세요.";
 
   return `${fileSummary}\n${textSummary}`;
 }
@@ -570,12 +570,12 @@ export default function Home() {
                   />
                 </label>
                 <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-graphite">자료 핵심 내용 직접 붙여넣기</span>
+                  <span className="text-sm font-semibold text-graphite">자료 메모 요약</span>
                   <textarea
                     value={materialText}
                     onChange={(event) => setMaterialText(event.target.value)}
                     rows={5}
-                    placeholder="현재 버전은 PDF/이미지 내용을 자동으로 읽지 않습니다. 기획서에서 확인한 핵심 문장, 브랜드 톤, 요구사항을 복사해 붙여넣어 주세요."
+                    placeholder="기획서의 핵심 문장, 브랜드 톤, 요구사항을 직접 요약해 주세요. 예: 사회적가치페스타 참여 부스, 텐웰즈 브랜드 컬러 활용, 상담과 체험이 가능한 팝업형 공간"
                     className="min-h-32 rounded-md border border-ink/15 bg-linen/40 px-3 py-2 text-sm leading-6 outline-none transition placeholder:text-graphite/45 focus:border-coral focus:bg-white focus:ring-2 focus:ring-coral/20"
                   />
                 </label>

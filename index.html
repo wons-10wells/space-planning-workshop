@@ -598,8 +598,8 @@
                   <input class="file-input" type="file" multiple accept=".pdf,image/png,image/jpeg,image/jpg" data-material-files />
                 </label>
                 <label class="wide">
-                  자료 핵심 내용 직접 붙여넣기
-                  <textarea data-material-text placeholder="현재 버전은 PDF/이미지 내용을 자동으로 읽지 않습니다. 기획서에서 확인한 핵심 문장, 브랜드 톤, 요구사항을 복사해 붙여넣어 주세요.">${state.materialText}</textarea>
+                  자료 메모 요약
+                  <textarea data-material-text placeholder="기획서의 핵심 문장, 브랜드 톤, 요구사항을 직접 요약해 주세요. 예: 사회적가치페스타 참여 부스, 텐웰즈 브랜드 컬러 활용, 상담과 체험이 가능한 팝업형 공간">${state.materialText}</textarea>
                 </label>
                 <div class="summary-box" id="materialSummary"></div>
                 <button class="primary-action" data-apply-draft>요약 초안 만들기</button>
@@ -808,7 +808,7 @@
         const files = state.fileNames.length ? state.fileNames.join(", ") : "아직 파일이 선택되지 않았습니다.";
         const text = state.materialText.trim()
           ? `${state.materialText.trim().slice(0, 260)}${state.materialText.trim().length > 260 ? "..." : ""}`
-          : "현재 버전은 파일 내용을 자동으로 읽지 않습니다. 핵심 문장이나 브랜드 설명을 직접 붙여넣어 주세요.";
+          : "기획서의 핵심 문장, 브랜드 설명, 요구사항을 직접 요약해 주세요.";
         return `입력 자료: ${files}\n자료 메모 요약: ${text}`;
       }
 
