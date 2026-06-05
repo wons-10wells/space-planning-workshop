@@ -463,11 +463,11 @@ export default function Home() {
               공간기획 워크숍
             </div>
             <h1 className="max-w-3xl text-3xl font-bold leading-tight text-ink sm:text-4xl">
-              워크시트를 이미지 생성 프롬프트로 바꾸는 기획 도구
+              기획서를 넣으면 공간기획을 해드려요
             </h1>
             <p className="mt-3 max-w-3xl text-base leading-7 text-graphite">
-              참가자별로 기관, 공간, 예산 조건을 입력하고 누락 정보와 현실성 체크를 확인한 뒤,
-              제출용 결과와 이미지 생성 요청문을 복사해 워크숍에 활용합니다.
+              참가자별로 기관, 공간, 예산 조건을 입력하면 누락 정보와 현실성 체크를 확인하고,
+              제출용 결과와 이미지 생성 요청문을 복사해 AI에 입력해 볼 수 있습니다. 그러면 공간이미지가 나옵니다.
             </p>
           </div>
           <div className="grid content-end gap-2 rounded-md border border-ink/10 bg-white p-4 shadow-panel">
