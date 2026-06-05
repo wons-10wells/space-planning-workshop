@@ -329,7 +329,7 @@ function buildMaterialSummary(materialText: string, fileNames: string[]) {
     : "입력 자료: 아직 파일이 선택되지 않았습니다.";
   const textSummary = materialText.trim()
     ? `자료 메모 요약: ${materialText.trim().slice(0, 260)}${materialText.trim().length > 260 ? "..." : ""}`
-    : "자료 메모 요약: 기획서의 핵심 문장이나 브랜드 설명을 붙여넣으면 초안이 더 구체화됩니다.";
+    : "자료 메모 요약: 현재 버전은 파일 내용을 자동으로 읽지 않습니다. 핵심 문장이나 브랜드 설명을 직접 붙여넣어 주세요.";
 
   return `${fileSummary}\n${textSummary}`;
 }
@@ -367,6 +367,7 @@ export default function Home() {
   const [fileNames, setFileNames] = useState<string[]>([]);
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState("");
+  const [draftMessage, setDraftMessage] = useState("");
 
   const conceptPrompt = useMemo(() => buildConceptPrompt(form), [form]);
   const imagePrompt = useMemo(() => buildImagePrompt(form), [form]);
@@ -390,6 +391,7 @@ export default function Home() {
 
   function chooseMode(mode: Exclude<StartMode, null>) {
     setStartMode(mode);
+    setDraftMessage("");
     if (mode === "manual") {
       setForm(initialForm);
       setMaterialText("");
@@ -399,6 +401,7 @@ export default function Home() {
 
   function applyMaterialDraft() {
     const baseName = fileNames[0]?.replace(/\.[^/.]+$/, "") ?? "";
+    const hasMaterialText = Boolean(materialText.trim());
     setForm((current) => ({
       ...current,
       ...materialDraft,
@@ -408,6 +411,11 @@ export default function Home() {
       mood: current.mood || "자료의 색감과 브랜드 톤을 반영한 분위기",
       style: current.style,
     }));
+    setDraftMessage(
+      hasMaterialText
+        ? "자료 메모를 바탕으로 초안을 채웠습니다. 아래 워크시트에서 내용을 확인하고 수정해 주세요."
+        : "파일명만 반영했습니다. 현재 버전은 PDF 내용을 자동 분석하지 않으므로 핵심 내용을 직접 붙여넣으면 초안이 더 구체화됩니다.",
+    );
   }
 
   async function handleSubmit() {
@@ -562,12 +570,12 @@ export default function Home() {
                   />
                 </label>
                 <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-graphite">자료에서 읽은 핵심 내용</span>
+                  <span className="text-sm font-semibold text-graphite">자료 핵심 내용 직접 붙여넣기</span>
                   <textarea
                     value={materialText}
                     onChange={(event) => setMaterialText(event.target.value)}
                     rows={5}
-                    placeholder="PDF나 브랜드 이미지에서 확인한 핵심 문장, 브랜드 톤, 요구사항을 붙여넣어 주세요. 이후 AI 연동 버전에서는 이 칸을 자동으로 채울 수 있습니다."
+                    placeholder="현재 버전은 PDF/이미지 내용을 자동으로 읽지 않습니다. 기획서에서 확인한 핵심 문장, 브랜드 톤, 요구사항을 복사해 붙여넣어 주세요."
                     className="min-h-32 rounded-md border border-ink/15 bg-linen/40 px-3 py-2 text-sm leading-6 outline-none transition placeholder:text-graphite/45 focus:border-coral focus:bg-white focus:ring-2 focus:ring-coral/20"
                   />
                 </label>
@@ -582,6 +590,11 @@ export default function Home() {
                   <Sparkles className="h-4 w-4" />
                   요약 초안 만들기
                 </button>
+                {draftMessage ? (
+                  <p className="rounded-md border border-coral/20 bg-coral/5 p-3 text-sm leading-6 text-graphite">
+                    {draftMessage}
+                  </p>
+                ) : null}
               </div>
             </section>
           ) : null}

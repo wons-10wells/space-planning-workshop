@@ -492,6 +492,7 @@
         startMode: "",
         materialText: "",
         fileNames: [],
+        draftMessage: "",
       };
 
       const styleOptions = [
@@ -597,11 +598,12 @@
                   <input class="file-input" type="file" multiple accept=".pdf,image/png,image/jpeg,image/jpg" data-material-files />
                 </label>
                 <label class="wide">
-                  자료에서 읽은 핵심 내용
-                  <textarea data-material-text placeholder="PDF나 브랜드 이미지에서 확인한 핵심 문장, 브랜드 톤, 요구사항을 붙여넣어 주세요. 이후 AI 연동 버전에서는 이 칸을 자동으로 채울 수 있습니다.">${state.materialText}</textarea>
+                  자료 핵심 내용 직접 붙여넣기
+                  <textarea data-material-text placeholder="현재 버전은 PDF/이미지 내용을 자동으로 읽지 않습니다. 기획서에서 확인한 핵심 문장, 브랜드 톤, 요구사항을 복사해 붙여넣어 주세요.">${state.materialText}</textarea>
                 </label>
                 <div class="summary-box" id="materialSummary"></div>
                 <button class="primary-action" data-apply-draft>요약 초안 만들기</button>
+                <p class="summary-box" id="draftMessage" style="display: none;"></p>
               </div>
             </section>
           ` : ""}
@@ -652,6 +654,7 @@
         document.querySelectorAll("[data-mode]").forEach((button) => {
           button.addEventListener("click", () => {
             state.startMode = button.dataset.mode;
+            state.draftMessage = "";
             if (state.startMode === "manual") {
               Object.keys(state).forEach((key) => {
                 if (!["style", "brandColor", "boothStyle", "startMode", "materialText", "fileNames"].includes(key)) state[key] = "";
@@ -710,6 +713,7 @@
 
         document.querySelector("[data-apply-draft]")?.addEventListener("click", () => {
           const firstFile = state.fileNames[0] ? state.fileNames[0].replace(/\.[^/.]+$/, "") : "";
+          const hasMaterialText = Boolean(state.materialText.trim());
           const draft = {
             organizationType: "자료 기반으로 확인 필요",
             users: "자료에서 언급된 주요 이용자 확인 필요",
@@ -724,6 +728,9 @@
             maintenance: "운영 인력과 청소/교체 난이도를 기준으로 확인해 주세요.",
           };
           Object.assign(state, draft);
+          state.draftMessage = hasMaterialText
+            ? "자료 메모를 바탕으로 초안을 채웠습니다. 아래 워크시트에서 내용을 확인하고 수정해 주세요."
+            : "파일명만 반영했습니다. 현재 버전은 PDF 내용을 자동 분석하지 않으므로 핵심 내용을 직접 붙여넣으면 초안이 더 구체화됩니다.";
           update();
         });
       }
@@ -801,7 +808,7 @@
         const files = state.fileNames.length ? state.fileNames.join(", ") : "아직 파일이 선택되지 않았습니다.";
         const text = state.materialText.trim()
           ? `${state.materialText.trim().slice(0, 260)}${state.materialText.trim().length > 260 ? "..." : ""}`
-          : "기획서의 핵심 문장이나 브랜드 설명을 붙여넣으면 초안이 더 구체화됩니다.";
+          : "현재 버전은 파일 내용을 자동으로 읽지 않습니다. 핵심 문장이나 브랜드 설명을 직접 붙여넣어 주세요.";
         return `입력 자료: ${files}\n자료 메모 요약: ${text}`;
       }
 
@@ -819,6 +826,10 @@
         document.querySelector("#imagePrompt").textContent = imagePrompt();
         document.querySelector("#submissionText").textContent = submissionText();
         document.querySelector("#materialSummary") && (document.querySelector("#materialSummary").textContent = materialSummary());
+        if (document.querySelector("#draftMessage")) {
+          document.querySelector("#draftMessage").textContent = state.draftMessage;
+          document.querySelector("#draftMessage").style.display = state.draftMessage ? "block" : "none";
+        }
         document.querySelectorAll("[data-field]").forEach((element) => {
           if (element.value !== state[element.dataset.field]) element.value = state[element.dataset.field];
         });
