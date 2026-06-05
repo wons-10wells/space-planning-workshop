@@ -6,6 +6,7 @@ import {
   Building2,
   Clipboard,
   Copy,
+  ExternalLink,
   FileText,
   Image as ImageIcon,
   Layers3,
@@ -368,6 +369,7 @@ export default function Home() {
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState("");
   const [draftMessage, setDraftMessage] = useState("");
+  const [imageToolMessage, setImageToolMessage] = useState("");
 
   const conceptPrompt = useMemo(() => buildConceptPrompt(form), [form]);
   const imagePrompt = useMemo(() => buildImagePrompt(form), [form]);
@@ -451,6 +453,17 @@ export default function Home() {
           : "제출 설정을 확인해 주세요. Google Apps Script URL이 필요합니다.",
       );
     }
+  }
+
+  async function openImageTool(url: string, label: string) {
+    try {
+      await navigator.clipboard.writeText(imagePrompt);
+      setImageToolMessage(`${label}가 열립니다. 새 창에서 복사된 요청문을 직접 붙여넣어 주세요.`);
+    } catch {
+      setImageToolMessage(`${label}가 열립니다. 요청문 복사가 막히면 위의 최종 이미지 요청문 복사 버튼을 사용해 주세요.`);
+    }
+
+    window.open(url, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -809,6 +822,32 @@ export default function Home() {
                 <Send className="h-4 w-4" />
                 {submitState === "submitting" ? "제출 중" : "구글시트에 제출하기"}
               </button>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => openImageTool("https://chatgpt.com/", "챗지피티")}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-graphite focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  챗지피티로 이미지 생성하기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openImageTool("https://gemini.google.com/", "구글 제미나이")}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-semibold text-white transition hover:bg-moss/90 focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  구글 제미나이로 이미지 생성하기
+                </button>
+              </div>
+              <p className="rounded-md bg-fog p-3 text-sm leading-6 text-graphite">
+                버튼을 누르면 최종 이미지 요청문이 복사되고 새 창이 열립니다. 창이 열리면 직접 붙여넣기를 해야 합니다.
+              </p>
+              {imageToolMessage ? (
+                <p className="rounded-md border border-moss/20 bg-white p-3 text-sm leading-6 text-graphite">
+                  {imageToolMessage}
+                </p>
+              ) : null}
               {submitMessage ? (
                 <p
                   className={`rounded-md p-3 text-sm leading-6 ${
