@@ -462,13 +462,14 @@ export default function Home() {
               <Sparkles className="h-4 w-4" />
               공간기획 워크숍
             </div>
-            <h1 className="max-w-3xl text-3xl font-bold leading-tight text-ink sm:text-4xl">
+            <h1 className="flex max-w-3xl items-center gap-3 text-3xl font-bold leading-tight text-ink sm:text-4xl">
+              <Sparkles className="h-8 w-8 shrink-0 text-coral sm:h-10 sm:w-10" />
               기획서를 넣으면 공간기획을 해드려요
             </h1>
             <p className="mt-3 max-w-3xl text-base leading-7 text-graphite">
               참가자별로 기관, 공간, 예산 조건을 입력하시고,
               <br />
-              누락 정보와 현실성 체크를 확인합니다.
+              기입된 정보와 조건들을 확인합니다.
               <br />
               생성된 요청문을 복사해 AI에 입력하면,
               <br />
