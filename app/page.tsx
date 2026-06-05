@@ -162,7 +162,7 @@ const sections: Array<{
     title: "기관 정보",
     icon: <Building2 className="h-4 w-4" />,
     fields: [
-      { key: "organizationName", label: "기관명", placeholder: "예: 서울시립청소년센터" },
+      { key: "organizationName", label: "기관명", placeholder: "예: 주식회사 텐웰즈" },
       { key: "organizationType", label: "기관 유형", placeholder: "예: 공공기관, 학교, 지역 커뮤니티 시설" },
       { key: "users", label: "주 이용자", placeholder: "예: 초등 고학년, 보호자, 지역 주민" },
       { key: "region", label: "지역/맥락", placeholder: "예: 오래된 주거지와 시장 사이의 생활권" },
