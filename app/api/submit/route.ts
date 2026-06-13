@@ -52,9 +52,19 @@ export async function POST(request: Request) {
         submissionText: payload.submissionText ?? "",
       }),
     });
+    const responseText = await response.text();
 
     if (!response.ok) {
       throw new Error(`Google Sheets endpoint returned ${response.status}`);
+    }
+
+    try {
+      const result = JSON.parse(responseText) as { ok?: boolean };
+      if (!result.ok) {
+        throw new Error("Google Sheets endpoint did not confirm success.");
+      }
+    } catch {
+      throw new Error("Google Sheets endpoint returned a non-JSON response.");
     }
 
     return NextResponse.json({ ok: true, message: "제출이 완료되었습니다." });

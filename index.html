@@ -979,7 +979,7 @@
           if (!response.ok || !result.ok) throw new Error(result.message || "제출 중 문제가 발생했습니다.");
           message.textContent = "제출이 완료되었습니다. 구글시트에서 새 행을 확인해 주세요.";
         } catch (error) {
-          message.textContent = error.message || "제출 설정을 확인해 주세요.";
+          message.textContent = error.message || "제출 설정을 확인해 주세요. Apps Script에 doPost 함수가 있는지 확인해 주세요.";
         }
       });
 
