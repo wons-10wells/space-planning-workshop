@@ -259,6 +259,36 @@
         padding: 12px;
       }
 
+      .reference-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .reference-card {
+        overflow: hidden;
+        border: 1px solid rgba(23, 33, 28, 0.12);
+        border-radius: 6px;
+        background: rgba(246, 241, 232, 0.45);
+      }
+
+      .reference-card img {
+        display: block;
+        width: 100%;
+        height: 128px;
+        object-fit: cover;
+      }
+
+      .reference-card figcaption {
+        overflow: hidden;
+        padding: 8px 10px;
+        color: var(--graphite);
+        font-size: 12px;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
       .summary-box {
         border-radius: 6px;
         background: var(--fog);
@@ -444,6 +474,7 @@
         .styles,
         .start-options,
         .image-tool-actions,
+        .reference-grid,
         .guide-grid {
           grid-template-columns: 1fr;
         }
@@ -551,6 +582,8 @@
         startMode: "",
         materialText: "",
         fileNames: [],
+        referenceImages: [],
+        referenceImageNotes: "",
         draftMessage: "",
         geminiState: "idle",
         geminiMessage: "",
@@ -655,12 +688,30 @@
               <h2 class="panel-title"><span class="icon">⇧</span>자료 입력</h2>
               <div class="stack">
                 <label>
-                  기획서/브랜드 이미지
+                  기획서/브랜드 자료
                   <input class="file-input" type="file" multiple accept=".pdf,image/png,image/jpeg,image/jpg" data-material-files />
                 </label>
+                <label>
+                  참고 이미지
+                  <input class="file-input" type="file" multiple accept="image/png,image/jpeg,image/jpg,image/webp" data-reference-images />
+                </label>
+                ${state.referenceImages.length ? `
+                  <div class="reference-grid">
+                    ${state.referenceImages.map((image) => `
+                      <figure class="reference-card">
+                        <img src="${image.preview}" alt="${image.name}" />
+                        <figcaption>${image.name}</figcaption>
+                      </figure>
+                    `).join("")}
+                  </div>
+                ` : ""}
                 <label class="wide">
                   자료 메모 요약
                   <textarea data-material-text placeholder="기획서의 핵심 문장, 브랜드 톤, 요구사항을 직접 요약해 주세요. 예: 사회적가치페스타 참여 부스, 텐웰즈 브랜드 컬러 활용, 상담과 체험이 가능한 팝업형 공간">${state.materialText}</textarea>
+                </label>
+                <label class="wide">
+                  참고 이미지 설명
+                  <textarea data-reference-image-notes placeholder="이미지에서 반영하고 싶은 요소를 적어 주세요. 예: 흰색 모듈 가구, 라임색 포인트, 체험 테이블이 중앙에 있고 상담석은 옆으로 분리된 구성">${state.referenceImageNotes}</textarea>
                 </label>
                 <div class="summary-box" id="materialSummary"></div>
                 <div class="action-row">
@@ -727,13 +778,15 @@
             state.geminiState = "idle";
             if (state.startMode === "manual") {
               Object.keys(state).forEach((key) => {
-                if (!["style", "brandColor", "boothStyle", "startMode", "materialText", "fileNames"].includes(key)) state[key] = "";
+                if (!["style", "brandColor", "boothStyle", "startMode", "materialText", "fileNames", "referenceImages", "referenceImageNotes"].includes(key)) state[key] = "";
               });
               state.brandColor = "브랜드 원색 중심";
               state.brandColorText = "";
               state.boothStyle = "워크숍 부스형";
               state.materialText = "";
               state.fileNames = [];
+              state.referenceImages = [];
+              state.referenceImageNotes = "";
             }
             renderForms();
             update();
@@ -781,14 +834,29 @@
           update();
         });
 
+        document.querySelector("[data-reference-images]")?.addEventListener("change", (event) => {
+          state.referenceImages = Array.from(event.target.files || []).map((file) => ({
+            name: file.name,
+            preview: URL.createObjectURL(file),
+          }));
+          renderForms();
+          update();
+        });
+
+        document.querySelector("[data-reference-image-notes]")?.addEventListener("input", (event) => {
+          state.referenceImageNotes = event.target.value;
+          update();
+        });
+
         document.querySelector("[data-apply-draft]")?.addEventListener("click", () => {
           const firstFile = state.fileNames[0] ? state.fileNames[0].replace(/\.[^/.]+$/, "") : "";
-          const hasMaterialText = Boolean(state.materialText.trim());
+          const combinedMaterialText = [state.materialText.trim(), state.referenceImageNotes.trim()].filter(Boolean).join("\n");
+          const hasMaterialText = Boolean(combinedMaterialText);
           const draft = {
             organizationType: "자료 기반으로 확인 필요",
             users: "자료에서 언급된 주요 이용자 확인 필요",
             projectName: state.projectName || firstFile || "자료 기반 공간기획 프로젝트",
-            goal: state.materialText.trim() || "업로드/입력한 자료를 바탕으로 공간의 목적, 해결할 문제, 기대 효과를 정리해 주세요.",
+            goal: combinedMaterialText || "업로드/입력한 자료를 바탕으로 공간의 목적, 해결할 문제, 기대 효과를 정리해 주세요.",
             keywords: state.keywords || "브랜드 이미지, 사용자 경험, 공간 정체성, 현실적 제작",
             mood: state.mood || "자료의 색감과 브랜드 톤을 반영한 분위기",
             spaceType: "자료 기반으로 확인 필요",
@@ -819,6 +887,8 @@
                 form: state,
                 materialText: state.materialText,
                 fileNames: state.fileNames,
+                referenceImageNames: state.referenceImages.map((image) => image.name),
+                referenceImageNotes: state.referenceImageNotes,
               }),
             });
             const result = await response.json();
@@ -912,10 +982,14 @@
 
       function materialSummary() {
         const files = state.fileNames.length ? state.fileNames.join(", ") : "아직 파일이 선택되지 않았습니다.";
+        const referenceImages = state.referenceImages.length ? state.referenceImages.map((image) => image.name).join(", ") : "아직 이미지가 선택되지 않았습니다.";
         const text = state.materialText.trim()
           ? `${state.materialText.trim().slice(0, 260)}${state.materialText.trim().length > 260 ? "..." : ""}`
           : "기획서의 핵심 문장, 브랜드 설명, 요구사항을 직접 요약해 주세요.";
-        return `입력 자료: ${files}\n자료 메모 요약: ${text}`;
+        const imageNotes = state.referenceImageNotes.trim()
+          ? `${state.referenceImageNotes.trim().slice(0, 260)}${state.referenceImageNotes.trim().length > 260 ? "..." : ""}`
+          : "이미지에서 반영하고 싶은 색, 분위기, 배치, 소재를 적어 주세요.";
+        return `입력 자료: ${files}\n참고 이미지: ${referenceImages}\n자료 메모 요약: ${text}\n참고 이미지 설명: ${imageNotes}`;
       }
 
       function update() {

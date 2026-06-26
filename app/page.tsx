@@ -45,6 +45,10 @@ type FormState = {
 
 type FieldKey = keyof FormState;
 type StartMode = "materials" | "manual" | null;
+type ReferenceImage = {
+  name: string;
+  preview: string;
+};
 
 const initialForm: FormState = {
   organizationName: "",
@@ -347,15 +351,26 @@ function getRealismChecks(form: FormState) {
   return checks;
 }
 
-function buildMaterialSummary(materialText: string, fileNames: string[]) {
+function buildMaterialSummary(
+  materialText: string,
+  fileNames: string[],
+  referenceImages: ReferenceImage[],
+  referenceImageNotes: string,
+) {
   const fileSummary = fileNames.length
     ? `입력 자료: ${fileNames.join(", ")}`
     : "입력 자료: 아직 파일이 선택되지 않았습니다.";
+  const referenceSummary = referenceImages.length
+    ? `참고 이미지: ${referenceImages.map((image) => image.name).join(", ")}`
+    : "참고 이미지: 아직 이미지가 선택되지 않았습니다.";
   const textSummary = materialText.trim()
     ? `자료 메모 요약: ${materialText.trim().slice(0, 260)}${materialText.trim().length > 260 ? "..." : ""}`
     : "자료 메모 요약: 기획서의 핵심 문장, 브랜드 설명, 요구사항을 직접 요약해 주세요.";
+  const imageNoteSummary = referenceImageNotes.trim()
+    ? `참고 이미지 설명: ${referenceImageNotes.trim().slice(0, 260)}${referenceImageNotes.trim().length > 260 ? "..." : ""}`
+    : "참고 이미지 설명: 이미지에서 반영하고 싶은 색, 분위기, 배치, 소재를 적어 주세요.";
 
-  return `${fileSummary}\n${textSummary}`;
+  return `${fileSummary}\n${referenceSummary}\n${textSummary}\n${imageNoteSummary}`;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -389,6 +404,8 @@ export default function Home() {
   const [startMode, setStartMode] = useState<StartMode>(null);
   const [materialText, setMaterialText] = useState("");
   const [fileNames, setFileNames] = useState<string[]>([]);
+  const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  const [referenceImageNotes, setReferenceImageNotes] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState("");
   const [draftMessage, setDraftMessage] = useState("");
@@ -403,8 +420,8 @@ export default function Home() {
     [form, conceptPrompt, imagePrompt],
   );
   const materialSummary = useMemo(
-    () => buildMaterialSummary(materialText, fileNames),
-    [materialText, fileNames],
+    () => buildMaterialSummary(materialText, fileNames, referenceImages, referenceImageNotes),
+    [materialText, fileNames, referenceImages, referenceImageNotes],
   );
   const missingFields = useMemo(
     () => requiredFields.filter((field) => !form[field.key].trim()),
@@ -423,17 +440,20 @@ export default function Home() {
       setForm(initialForm);
       setMaterialText("");
       setFileNames([]);
+      setReferenceImages([]);
+      setReferenceImageNotes("");
     }
   }
 
   function applyMaterialDraft() {
     const baseName = fileNames[0]?.replace(/\.[^/.]+$/, "") ?? "";
-    const hasMaterialText = Boolean(materialText.trim());
+    const combinedMaterialText = [materialText.trim(), referenceImageNotes.trim()].filter(Boolean).join("\n");
+    const hasMaterialText = Boolean(combinedMaterialText);
     setForm((current) => ({
       ...current,
       ...materialDraft,
       projectName: current.projectName || baseName || "자료 기반 공간기획 프로젝트",
-      goal: materialText.trim() || materialDraft.goal || "",
+      goal: combinedMaterialText || materialDraft.goal || "",
       keywords: current.keywords || "브랜드 이미지, 사용자 경험, 공간 정체성, 현실적 제작",
       mood: current.mood || "자료의 색감과 브랜드 톤을 반영한 분위기",
       style: current.style,
@@ -459,6 +479,8 @@ export default function Home() {
           form,
           materialText,
           fileNames,
+          referenceImageNames: referenceImages.map((image) => image.name),
+          referenceImageNotes,
         }),
       });
       const result = (await response.json()) as {
@@ -492,6 +514,15 @@ export default function Home() {
           : "Gemini 초안 생성에 실패했습니다. Vercel 환경변수 GEMINI_API_KEY를 확인해 주세요.",
       );
     }
+  }
+
+  function handleReferenceImageUpload(files: FileList | null) {
+    setReferenceImages(
+      Array.from(files ?? []).map((file) => ({
+        name: file.name,
+        preview: URL.createObjectURL(file),
+      })),
+    );
   }
 
   async function handleSubmit() {
@@ -651,7 +682,7 @@ export default function Home() {
               </div>
               <div className="grid gap-4">
                 <label className="grid gap-2">
-                  <span className="text-sm font-semibold text-graphite">기획서/브랜드 이미지</span>
+                  <span className="text-sm font-semibold text-graphite">기획서/브랜드 자료</span>
                   <input
                     type="file"
                     multiple
@@ -663,6 +694,31 @@ export default function Home() {
                   />
                 </label>
                 <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-graphite">참고 이미지</span>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/png,image/jpeg,image/jpg,image/webp"
+                    onChange={(event) => handleReferenceImageUpload(event.target.files)}
+                    className="rounded-md border border-dashed border-ink/20 bg-linen/40 px-3 py-3 text-sm text-graphite file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                  />
+                </label>
+                {referenceImages.length ? (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {referenceImages.map((image) => (
+                      <figure
+                        key={`${image.name}-${image.preview}`}
+                        className="overflow-hidden rounded-md border border-ink/10 bg-linen/40"
+                      >
+                        <img src={image.preview} alt={image.name} className="h-32 w-full object-cover" />
+                        <figcaption className="truncate px-3 py-2 text-xs font-semibold text-graphite">
+                          {image.name}
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                ) : null}
+                <label className="grid gap-2">
                   <span className="text-sm font-semibold text-graphite">자료 메모 요약</span>
                   <textarea
                     value={materialText}
@@ -670,6 +726,16 @@ export default function Home() {
                     rows={5}
                     placeholder="기획서의 핵심 문장, 브랜드 톤, 요구사항을 직접 요약해 주세요. 예: 사회적가치페스타 참여 부스, 텐웰즈 브랜드 컬러 활용, 상담과 체험이 가능한 팝업형 공간"
                     className="min-h-32 rounded-md border border-ink/15 bg-linen/40 px-3 py-2 text-sm leading-6 outline-none transition placeholder:text-graphite/45 focus:border-coral focus:bg-white focus:ring-2 focus:ring-coral/20"
+                  />
+                </label>
+                <label className="grid gap-2">
+                  <span className="text-sm font-semibold text-graphite">참고 이미지 설명</span>
+                  <textarea
+                    value={referenceImageNotes}
+                    onChange={(event) => setReferenceImageNotes(event.target.value)}
+                    rows={4}
+                    placeholder="이미지에서 반영하고 싶은 요소를 적어 주세요. 예: 흰색 모듈 가구, 라임색 포인트, 체험 테이블이 중앙에 있고 상담석은 옆으로 분리된 구성"
+                    className="min-h-28 rounded-md border border-ink/15 bg-linen/40 px-3 py-2 text-sm leading-6 outline-none transition placeholder:text-graphite/45 focus:border-coral focus:bg-white focus:ring-2 focus:ring-coral/20"
                   />
                 </label>
                 <div className="rounded-md bg-fog p-3 text-sm leading-6 text-graphite">

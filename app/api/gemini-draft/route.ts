@@ -4,6 +4,8 @@ type DraftRequest = {
   form?: Record<string, string>;
   materialText?: string;
   fileNames?: string[];
+  referenceImageNames?: string[];
+  referenceImageNotes?: string;
 };
 
 const draftKeys = [
@@ -68,11 +70,13 @@ export async function POST(request: Request) {
 
   const materialText = payload.materialText?.trim() ?? "";
   const fileNames = payload.fileNames ?? [];
+  const referenceImageNames = payload.referenceImageNames ?? [];
+  const referenceImageNotes = payload.referenceImageNotes?.trim() ?? "";
   const form = payload.form ?? {};
 
-  if (!materialText && !fileNames.length) {
+  if (!materialText && !fileNames.length && !referenceImageNames.length && !referenceImageNotes) {
     return NextResponse.json(
-      { ok: false, message: "자료 메모 요약이나 파일명을 먼저 입력해 주세요." },
+      { ok: false, message: "자료 메모 요약, 파일명, 참고 이미지 설명 중 하나를 먼저 입력해 주세요." },
       { status: 400 },
     );
   }
@@ -92,8 +96,14 @@ export async function POST(request: Request) {
 입력 파일명:
 ${fileNames.length ? fileNames.join(", ") : "없음"}
 
+참고 이미지 파일명:
+${referenceImageNames.length ? referenceImageNames.join(", ") : "없음"}
+
 자료 메모 요약:
 ${materialText || "없음"}
+
+참고 이미지 설명:
+${referenceImageNotes || "없음"}
 
 현재 입력값:
 ${JSON.stringify(form, null, 2)}
