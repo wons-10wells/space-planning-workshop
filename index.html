@@ -880,6 +880,10 @@
           update();
 
           try {
+            if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+              throw new Error("로컬 미리보기에서는 Gemini API가 작동하지 않습니다. Vercel 공유 링크에서 테스트해 주세요.");
+            }
+
             const response = await fetch("/api/gemini-draft", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -891,7 +895,9 @@
                 referenceImageNotes: state.referenceImageNotes,
               }),
             });
-            const result = await response.json();
+            const result = await response.json().catch(() => {
+              throw new Error("Gemini API 응답을 읽지 못했습니다. Vercel 배포와 GEMINI_API_KEY 설정을 확인해 주세요.");
+            });
 
             if (!response.ok || !result.ok || !result.draft) throw new Error(result.message || "Gemini 초안 생성 중 문제가 발생했습니다.");
 

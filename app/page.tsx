@@ -483,7 +483,9 @@ export default function Home() {
           referenceImageNotes,
         }),
       });
-      const result = (await response.json()) as {
+      const result = (await response.json().catch(() => {
+        throw new Error("Gemini API 응답을 읽지 못했습니다. Vercel 배포와 GEMINI_API_KEY 설정을 확인해 주세요.");
+      })) as {
         ok?: boolean;
         draft?: Partial<FormState>;
         message?: string;
