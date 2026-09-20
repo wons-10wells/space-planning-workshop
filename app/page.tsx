@@ -4,11 +4,13 @@ import { useMemo, useState } from "react";
 import type { ClipboardEvent, DragEvent, ReactNode } from "react";
 import {
   Building2,
+  Camera,
   Clipboard,
   Copy,
   ExternalLink,
   FileText,
   Image as ImageIcon,
+  Images,
   Layers3,
   PencilLine,
   Send,
@@ -547,12 +549,22 @@ export default function Home() {
 
   function addFiles(files: File[], target: "materials" | "references") {
     if (!files.length) return;
+    const mimeByExtension: Record<string, string> = {
+      pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
+      webp: "image/webp", heic: "image/heic", heif: "image/heif",
+    };
+    const normalized = files.map((file) => {
+      if (file.type) return file;
+      const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+      const type = mimeByExtension[extension];
+      return type ? new File([file], file.name, { type }) : file;
+    });
     const allowed = target === "materials"
-      ? ["application/pdf", "image/png", "image/jpeg"]
-      : ["image/png", "image/jpeg", "image/webp"];
-    const valid = files.filter((file) => allowed.includes(file.type));
-    if (valid.length !== files.length) {
-      setUploadMessage(target === "materials" ? "PDF, PNG, JPG 파일만 넣을 수 있습니다." : "PNG, JPG, WEBP 이미지만 넣을 수 있습니다.");
+      ? ["application/pdf", "image/png", "image/jpeg", "image/heic", "image/heif"]
+      : ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"];
+    const valid = normalized.filter((file) => allowed.includes(file.type));
+    if (valid.length !== normalized.length) {
+      setUploadMessage(target === "materials" ? "PDF 또는 이미지 파일을 넣어 주세요." : "이미지 파일을 넣어 주세요.");
       return;
     }
     if (materialFiles.length + referenceImages.length + valid.length > 5) {
@@ -758,10 +770,20 @@ export default function Home() {
                       type="file"
                       multiple
                       aria-label="기획서/브랜드 자료 파일 선택"
-                      accept=".pdf,image/png,image/jpeg,image/jpg"
+                      accept=".pdf,image/png,image/jpeg,image/jpg,image/heic,image/heif"
                       onChange={(event) => { addFiles(Array.from(event.target.files ?? []), "materials"); event.target.value = ""; }}
                       className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-ink file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
                     />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <label htmlFor="material-photo" className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-ink/20 bg-white px-3 py-2 font-semibold text-ink">
+                        <Images className="h-4 w-4" />사진첩/캡처 선택
+                      </label>
+                      <input id="material-photo" type="file" accept="image/*" aria-label="기획서 사진첩에서 선택" onChange={(event) => { addFiles(Array.from(event.target.files ?? []), "materials"); event.target.value = ""; }} className="sr-only" />
+                      <label htmlFor="material-camera" className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-ink/20 bg-white px-3 py-2 font-semibold text-ink">
+                        <Camera className="h-4 w-4" />카메라 촬영
+                      </label>
+                      <input id="material-camera" type="file" accept="image/*" capture="environment" aria-label="기획서 카메라로 촬영" onChange={(event) => { addFiles(Array.from(event.target.files ?? []), "materials"); event.target.value = ""; }} className="sr-only" />
+                    </div>
                     <p className="mt-2 text-xs">파일을 끌어다 놓거나, 이 영역을 클릭한 뒤 이미지를 붙여넣으세요 (⌘V).</p>
                   </div>
                   {materialFiles.length ? (
@@ -791,10 +813,20 @@ export default function Home() {
                       type="file"
                       multiple
                       aria-label="참고 이미지 파일 선택"
-                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/heic,image/heif"
                       onChange={(event) => { addFiles(Array.from(event.target.files ?? []), "references"); event.target.value = ""; }}
                       className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
                     />
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <label htmlFor="reference-photo" className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-ink/20 bg-white px-3 py-2 font-semibold text-ink">
+                        <Images className="h-4 w-4" />사진첩/캡처 선택
+                      </label>
+                      <input id="reference-photo" type="file" accept="image/*" aria-label="참고 이미지 사진첩에서 선택" onChange={(event) => { addFiles(Array.from(event.target.files ?? []), "references"); event.target.value = ""; }} className="sr-only" />
+                      <label htmlFor="reference-camera" className="inline-flex min-h-10 cursor-pointer items-center gap-2 rounded-md border border-ink/20 bg-white px-3 py-2 font-semibold text-ink">
+                        <Camera className="h-4 w-4" />카메라 촬영
+                      </label>
+                      <input id="reference-camera" type="file" accept="image/*" capture="environment" aria-label="참고 이미지 카메라로 촬영" onChange={(event) => { addFiles(Array.from(event.target.files ?? []), "references"); event.target.value = ""; }} className="sr-only" />
+                    </div>
                     <p className="mt-2 text-xs">이미지를 끌어다 놓거나, 이 영역을 클릭한 뒤 붙여넣으세요 (⌘V).</p>
                   </div>
                 </div>
