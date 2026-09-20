@@ -48,7 +48,27 @@ type StartMode = "materials" | "manual" | null;
 type ReferenceImage = {
   name: string;
   preview: string;
+  file: File;
 };
+
+async function prepareImage(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1800 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("이미지를 읽지 못했습니다.");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((result) => result ? resolve(result) : reject(new Error("이미지를 읽지 못했습니다.")), "image/jpeg", 0.8),
+  );
+  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+}
 
 const initialForm: FormState = {
   organizationName: "",
@@ -404,6 +424,7 @@ export default function Home() {
   const [startMode, setStartMode] = useState<StartMode>(null);
   const [materialText, setMaterialText] = useState("");
   const [fileNames, setFileNames] = useState<string[]>([]);
+  const [materialFiles, setMaterialFiles] = useState<File[]>([]);
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
   const [referenceImageNotes, setReferenceImageNotes] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
@@ -440,6 +461,7 @@ export default function Home() {
       setForm(initialForm);
       setMaterialText("");
       setFileNames([]);
+      setMaterialFiles([]);
       setReferenceImages([]);
       setReferenceImageNotes("");
     }
@@ -467,21 +489,22 @@ export default function Home() {
 
   async function applyGeminiDraft() {
     setGeminiState("loading");
-    setGeminiMessage("Gemini가 자료 메모를 읽고 워크시트 초안을 만드는 중입니다.");
+    setGeminiMessage("Gemini가 PDF와 사진을 읽고 워크시트 초안을 만드는 중입니다.");
 
     try {
+      const files = await Promise.all(
+        [...materialFiles, ...referenceImages.map((image) => image.file)].map(prepareImage),
+      );
+      if (files.length > 5 || files.reduce((total, file) => total + file.size, 0) > 4 * 1024 * 1024) {
+        throw new Error("파일은 최대 5개, 전체 4MB 이하로 올려 주세요. 큰 PDF는 필요한 페이지만 나눠 저장해 주세요.");
+      }
+      const body = new FormData();
+      body.set("payload", JSON.stringify({ form, materialText, referenceImageNotes }));
+      materialFiles.forEach((_, index) => body.append("materials", files[index]));
+      referenceImages.forEach((_, index) => body.append("references", files[materialFiles.length + index]));
       const response = await fetch("/api/gemini-draft", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          form,
-          materialText,
-          fileNames,
-          referenceImageNames: referenceImages.map((image) => image.name),
-          referenceImageNotes,
-        }),
+        body,
       });
       const result = (await response.json().catch(() => {
         throw new Error("Gemini API 응답을 읽지 못했습니다. Vercel 배포와 GEMINI_API_KEY 설정을 확인해 주세요.");
@@ -499,14 +522,14 @@ export default function Home() {
         const next = { ...current };
         geminiDraftFields.forEach((key) => {
           const value = result.draft?.[key];
-          if (typeof value === "string" && value.trim()) {
+          if (typeof value === "string" && value.trim() && !current[key].trim()) {
             next[key] = value;
           }
         });
         return next;
       });
       setGeminiState("success");
-      setGeminiMessage("Gemini 초안을 반영했습니다. 아래 워크시트에서 사실관계와 표현을 확인해 주세요.");
+      setGeminiMessage("자료에서 확인된 내용을 빈칸에 채웠습니다. 아래 워크시트에서 사실관계를 확인하고 수정해 주세요.");
       setDraftMessage("");
     } catch (error) {
       setGeminiState("error");
@@ -519,10 +542,12 @@ export default function Home() {
   }
 
   function handleReferenceImageUpload(files: FileList | null) {
+    referenceImages.forEach((image) => URL.revokeObjectURL(image.preview));
     setReferenceImages(
       Array.from(files ?? []).map((file) => ({
         name: file.name,
         preview: URL.createObjectURL(file),
+        file,
       })),
     );
   }
@@ -689,9 +714,11 @@ export default function Home() {
                     type="file"
                     multiple
                     accept=".pdf,image/png,image/jpeg,image/jpg"
-                    onChange={(event) =>
-                      setFileNames(Array.from(event.target.files ?? []).map((file) => file.name))
-                    }
+                    onChange={(event) => {
+                      const files = Array.from(event.target.files ?? []);
+                      setMaterialFiles(files);
+                      setFileNames(files.map((file) => file.name));
+                    }}
                     className="rounded-md border border-dashed border-ink/20 bg-linen/40 px-3 py-3 text-sm text-graphite file:mr-3 file:rounded-md file:border-0 file:bg-ink file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
                   />
                 </label>
@@ -750,7 +777,7 @@ export default function Home() {
                     className="inline-flex h-10 w-fit items-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-graphite focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2"
                   >
                     <Sparkles className="h-4 w-4" />
-                    기본 초안 만들기
+                    메모로 기본 초안 만들기
                   </button>
                   <button
                     type="button"
@@ -759,11 +786,11 @@ export default function Home() {
                     className="inline-flex h-10 w-fit items-center gap-2 rounded-md bg-moss px-4 text-sm font-semibold text-white transition hover:bg-moss/90 focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Sparkles className="h-4 w-4" />
-                    {geminiState === "loading" ? "Gemini 생성 중" : "Gemini 무료 티어로 초안 만들기"}
+                    {geminiState === "loading" ? "자료 분석 중" : "PDF·사진 분석해 빈칸 채우기"}
                   </button>
                 </div>
                 <p className="rounded-md bg-fog p-3 text-sm leading-6 text-graphite">
-                  Gemini 버튼은 Vercel 환경변수에 API 키를 설정한 뒤 배포 링크에서 작동합니다. PDF 본문 자동 추출은 아직 아니며, 자료 메모 요약에 붙여넣은 내용을 바탕으로 초안을 만듭니다.
+                  PDF, 촬영한 워크시트, 기획서 이미지와 참고 이미지를 Google Gemini로 전송해 분석합니다. 사진은 전송 전에 축소되며, 파일은 최대 5개·전체 4MB까지 가능합니다. 메모로 기본 초안 만들기는 파일 내용을 읽지 않습니다.
                 </p>
                 {draftMessage ? (
                   <p className="rounded-md border border-coral/20 bg-coral/5 p-3 text-sm leading-6 text-graphite">
