@@ -21,6 +21,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!/^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec$/.test(endpoint.trim())) {
+    return NextResponse.json(
+      { ok: false, message: "Vercel의 GOOGLE_SHEETS_WEBAPP_URL에 Apps Script 웹 앱 /exec 주소를 설정해 주세요." },
+      { status: 500 },
+    );
+  }
+
   let payload: SubmissionPayload;
 
   try {
@@ -35,7 +42,7 @@ export async function POST(request: Request) {
   const form = payload.form ?? {};
 
   try {
-    const response = await fetch(endpoint, {
+    const response = await fetch(endpoint.trim(), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -54,17 +61,35 @@ export async function POST(request: Request) {
     });
     const responseText = await response.text();
 
-    if (!response.ok) {
-      throw new Error(`Google Sheets endpoint returned ${response.status}`);
+    if (response.status === 401 || response.status === 403) {
+      return NextResponse.json(
+        { ok: false, message: "Apps Script 접근이 거부됐습니다. 웹 앱 접근 권한을 '모든 사용자'로 다시 배포해 주세요." },
+        { status: 502 },
+      );
     }
 
+    if (responseText.includes("doPost") && responseText.includes("찾을 수 없습니다")) {
+      return NextResponse.json(
+        { ok: false, message: "Apps Script 배포 버전에 doPost 함수가 없습니다. 코드를 저장하고 새 버전으로 배포해 주세요." },
+        { status: 502 },
+      );
+    }
+
+    let result: { ok?: boolean; message?: string };
     try {
-      const result = JSON.parse(responseText) as { ok?: boolean };
-      if (!result.ok) {
-        throw new Error("Google Sheets endpoint did not confirm success.");
-      }
+      result = JSON.parse(responseText) as { ok?: boolean; message?: string };
     } catch {
-      throw new Error("Google Sheets endpoint returned a non-JSON response.");
+      return NextResponse.json(
+        { ok: false, message: "Apps Script가 JSON 대신 오류 페이지를 반환했습니다. 웹 앱 URL과 배포 기록을 확인해 주세요." },
+        { status: 502 },
+      );
+    }
+
+    if (!response.ok || result.ok !== true) {
+      return NextResponse.json(
+        { ok: false, message: result.message || `Apps Script 제출에 실패했습니다. (HTTP ${response.status})` },
+        { status: 502 },
+      );
     }
 
     return NextResponse.json({ ok: true, message: "제출이 완료되었습니다." });

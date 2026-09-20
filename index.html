@@ -1041,6 +1041,10 @@
 
       document.querySelector("[data-submit]").addEventListener("click", async () => {
         const message = document.querySelector("#submitMessage");
+        if (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+          message.textContent = "로컬 미리보기에서는 구글시트에 제출할 수 없습니다. Vercel 공유 링크에서 제출해 주세요.";
+          return;
+        }
         message.textContent = "제출 중입니다.";
 
         try {
@@ -1054,7 +1058,9 @@
               submissionText: submissionText(),
             }),
           });
-          const result = await response.json();
+          const result = await response.json().catch(() => {
+            throw new Error("제출 서버의 응답을 읽지 못했습니다. Vercel 배포 상태를 확인해 주세요.");
+          });
 
           if (!response.ok || !result.ok) throw new Error(result.message || "제출 중 문제가 발생했습니다.");
           message.textContent = "제출이 완료되었습니다. 구글시트에서 새 행을 확인해 주세요.";
