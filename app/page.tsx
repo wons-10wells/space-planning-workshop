@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { ClipboardEvent, DragEvent, ReactNode } from "react";
 import {
   Building2,
   Clipboard,
@@ -15,6 +15,7 @@ import {
   Sparkles,
   UploadCloud,
   WalletCards,
+  X,
 } from "lucide-react";
 
 type FormState = {
@@ -423,9 +424,10 @@ export default function Home() {
   const [form, setForm] = useState<FormState>(initialForm);
   const [startMode, setStartMode] = useState<StartMode>(null);
   const [materialText, setMaterialText] = useState("");
-  const [fileNames, setFileNames] = useState<string[]>([]);
   const [materialFiles, setMaterialFiles] = useState<File[]>([]);
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [dragTarget, setDragTarget] = useState<"materials" | "references" | null>(null);
   const [referenceImageNotes, setReferenceImageNotes] = useState("");
   const [submitState, setSubmitState] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [submitMessage, setSubmitMessage] = useState("");
@@ -433,6 +435,7 @@ export default function Home() {
   const [geminiState, setGeminiState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [geminiMessage, setGeminiMessage] = useState("");
   const [imageToolMessage, setImageToolMessage] = useState("");
+  const fileNames = materialFiles.map((file) => file.name);
 
   const conceptPrompt = useMemo(() => buildConceptPrompt(form), [form]);
   const imagePrompt = useMemo(() => buildImagePrompt(form), [form]);
@@ -460,9 +463,10 @@ export default function Home() {
     if (mode === "manual") {
       setForm(initialForm);
       setMaterialText("");
-      setFileNames([]);
       setMaterialFiles([]);
+      referenceImages.forEach((image) => URL.revokeObjectURL(image.preview));
       setReferenceImages([]);
+      setUploadMessage("");
       setReferenceImageNotes("");
     }
   }
@@ -541,15 +545,45 @@ export default function Home() {
     }
   }
 
-  function handleReferenceImageUpload(files: FileList | null) {
-    referenceImages.forEach((image) => URL.revokeObjectURL(image.preview));
-    setReferenceImages(
-      Array.from(files ?? []).map((file) => ({
-        name: file.name,
-        preview: URL.createObjectURL(file),
-        file,
-      })),
-    );
+  function addFiles(files: File[], target: "materials" | "references") {
+    if (!files.length) return;
+    const allowed = target === "materials"
+      ? ["application/pdf", "image/png", "image/jpeg"]
+      : ["image/png", "image/jpeg", "image/webp"];
+    const valid = files.filter((file) => allowed.includes(file.type));
+    if (valid.length !== files.length) {
+      setUploadMessage(target === "materials" ? "PDF, PNG, JPG 파일만 넣을 수 있습니다." : "PNG, JPG, WEBP 이미지만 넣을 수 있습니다.");
+      return;
+    }
+    if (materialFiles.length + referenceImages.length + valid.length > 5) {
+      setUploadMessage("파일은 기획서와 참고 이미지를 합쳐 최대 5개까지 넣을 수 있습니다.");
+      return;
+    }
+    if (target === "materials") {
+      setMaterialFiles((current) => [...current, ...valid]);
+    } else {
+      setReferenceImages((current) => [
+        ...current,
+        ...valid.map((file) => ({ name: file.name, preview: URL.createObjectURL(file), file })),
+      ]);
+    }
+    setUploadMessage("");
+  }
+
+  function handleDrop(event: DragEvent<HTMLElement>, target: "materials" | "references") {
+    event.preventDefault();
+    setDragTarget(null);
+    addFiles(Array.from(event.dataTransfer.files), target);
+  }
+
+  function handlePaste(event: ClipboardEvent<HTMLElement>, target: "materials" | "references") {
+    const files = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+    if (!files.length) return;
+    event.preventDefault();
+    addFiles(files, target);
   }
 
   async function handleSubmit() {
@@ -708,37 +742,71 @@ export default function Home() {
                 자료 입력
               </div>
               <div className="grid gap-4">
-                <label className="grid gap-2">
+                <div className="grid gap-2">
                   <span className="text-sm font-semibold text-graphite">기획서/브랜드 자료</span>
-                  <input
-                    type="file"
-                    multiple
-                    accept=".pdf,image/png,image/jpeg,image/jpg"
-                    onChange={(event) => {
-                      const files = Array.from(event.target.files ?? []);
-                      setMaterialFiles(files);
-                      setFileNames(files.map((file) => file.name));
-                    }}
-                    className="rounded-md border border-dashed border-ink/20 bg-linen/40 px-3 py-3 text-sm text-graphite file:mr-3 file:rounded-md file:border-0 file:bg-ink file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-                  />
-                </label>
-                <label className="grid gap-2">
+                  <div
+                    tabIndex={0}
+                    aria-label="기획서/브랜드 자료 붙여넣기 또는 끌어다 놓기"
+                    onPaste={(event) => handlePaste(event, "materials")}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDragEnter={(event) => { event.preventDefault(); setDragTarget("materials"); }}
+                    onDragLeave={() => setDragTarget(null)}
+                    onDrop={(event) => handleDrop(event, "materials")}
+                    className={`rounded-md border border-dashed bg-linen/40 px-3 py-3 text-sm text-graphite outline-none focus:ring-2 focus:ring-coral ${dragTarget === "materials" ? "border-coral bg-coral/10" : "border-ink/20"}`}
+                  >
+                    <input
+                      type="file"
+                      multiple
+                      aria-label="기획서/브랜드 자료 파일 선택"
+                      accept=".pdf,image/png,image/jpeg,image/jpg"
+                      onChange={(event) => { addFiles(Array.from(event.target.files ?? []), "materials"); event.target.value = ""; }}
+                      className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-ink file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                    />
+                    <p className="mt-2 text-xs">파일을 끌어다 놓거나, 이 영역을 클릭한 뒤 이미지를 붙여넣으세요 (⌘V).</p>
+                  </div>
+                  {materialFiles.length ? (
+                    <ul className="grid gap-1">
+                      {materialFiles.map((file, index) => (
+                        <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 text-xs text-graphite">
+                          <span className="truncate">{file.name}</span>
+                          <button type="button" title="파일 제거" aria-label={`${file.name} 제거`} onClick={() => setMaterialFiles((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="rounded p-1 hover:bg-ink/10"><X className="h-4 w-4" /></button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+                <div className="grid gap-2">
                   <span className="text-sm font-semibold text-graphite">참고 이미지</span>
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/png,image/jpeg,image/jpg,image/webp"
-                    onChange={(event) => handleReferenceImageUpload(event.target.files)}
-                    className="rounded-md border border-dashed border-ink/20 bg-linen/40 px-3 py-3 text-sm text-graphite file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
-                  />
-                </label>
+                  <div
+                    tabIndex={0}
+                    aria-label="참고 이미지 붙여넣기 또는 끌어다 놓기"
+                    onPaste={(event) => handlePaste(event, "references")}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDragEnter={(event) => { event.preventDefault(); setDragTarget("references"); }}
+                    onDragLeave={() => setDragTarget(null)}
+                    onDrop={(event) => handleDrop(event, "references")}
+                    className={`rounded-md border border-dashed bg-linen/40 px-3 py-3 text-sm text-graphite outline-none focus:ring-2 focus:ring-coral ${dragTarget === "references" ? "border-coral bg-coral/10" : "border-ink/20"}`}
+                  >
+                    <input
+                      type="file"
+                      multiple
+                      aria-label="참고 이미지 파일 선택"
+                      accept="image/png,image/jpeg,image/jpg,image/webp"
+                      onChange={(event) => { addFiles(Array.from(event.target.files ?? []), "references"); event.target.value = ""; }}
+                      className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-moss file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
+                    />
+                    <p className="mt-2 text-xs">이미지를 끌어다 놓거나, 이 영역을 클릭한 뒤 붙여넣으세요 (⌘V).</p>
+                  </div>
+                </div>
+                {uploadMessage ? <p role="alert" className="text-sm text-coral">{uploadMessage}</p> : null}
                 {referenceImages.length ? (
                   <div className="grid gap-3 sm:grid-cols-3">
                     {referenceImages.map((image) => (
                       <figure
                         key={`${image.name}-${image.preview}`}
-                        className="overflow-hidden rounded-md border border-ink/10 bg-linen/40"
+                        className="relative overflow-hidden rounded-md border border-ink/10 bg-linen/40"
                       >
+                        <button type="button" title="이미지 제거" aria-label={`${image.name} 제거`} onClick={() => { URL.revokeObjectURL(image.preview); setReferenceImages((current) => current.filter((item) => item !== image)); }} className="absolute right-1 top-1 rounded bg-white/90 p-1 text-ink hover:bg-white"><X className="h-4 w-4" /></button>
                         <img src={image.preview} alt={image.name} className="h-32 w-full object-cover" />
                         <figcaption className="truncate px-3 py-2 text-xs font-semibold text-graphite">
                           {image.name}
