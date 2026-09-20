@@ -44,34 +44,37 @@ npm run dev
 
 ## Google Sheet 제출 설정
 
-1. Google Sheet를 새로 만듭니다.
+1. [워크숍 구글시트](https://docs.google.com/spreadsheets/d/1exkZRPKxwM6YUI4iK5Z4Z7qAiXxefzQaKDjQukmbO6c/edit)를 엽니다. `시트1`의 A~C열은 `제출시간`, `프로젝트명`, `제출용 전체 결과`입니다.
 2. 메뉴에서 `확장 프로그램` → `Apps Script`를 엽니다.
-3. 아래 코드를 붙여넣고 저장합니다.
+3. 기존 코드를 아래 코드로 교체하고 저장합니다.
 
 ```js
 function doPost(e) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  const data = JSON.parse(e.postData.contents);
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const sheet = SpreadsheetApp
+      .openById("1exkZRPKxwM6YUI4iK5Z4Z7qAiXxefzQaKDjQukmbO6c")
+      .getSheetByName("시트1");
+    if (!sheet) throw new Error("시트1을 찾을 수 없습니다.");
 
-  sheet.appendRow([
-    new Date(),
-    data.participantName || "",
-    data.teamName || "",
-    data.organizationName || "",
-    data.projectName || "",
-    data.conceptPrompt || "",
-    data.imagePrompt || "",
-    data.submissionText || "",
-    JSON.stringify(data.form || {}),
-  ]);
+    sheet.appendRow([
+      new Date(),
+      data.projectName || "미정",
+      data.submissionText || "",
+    ]);
 
-  return ContentService
-    .createTextOutput(JSON.stringify({ ok: true }))
-    .setMimeType(ContentService.MimeType.JSON);
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true, schema: "workshop-three-columns-v1" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, message: String(error) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 ```
 
-코드 저장 후 반드시 `배포` → `배포 관리` → 웹 앱 배포 `수정`에서 새 버전으로 다시 배포해야 합니다. 웹 앱 URL 테스트 시 `doPost` 함수를 찾을 수 없다는 오류가 나오면 위 코드가 저장/배포되지 않은 상태입니다.
+코드 저장 후 반드시 `배포` → `배포 관리` → 웹 앱 배포 `수정`에서 `새 버전`으로 다시 배포해야 합니다. 웹 앱 URL 테스트 시 `doPost` 함수를 찾을 수 없다는 오류가 나오면 위 코드가 저장/배포되지 않은 상태입니다.
 
 4. `배포` → `새 배포` → 유형 `웹 앱`을 선택합니다.
 5. 실행 권한은 본인, 접근 권한은 `모든 사용자`로 설정합니다.

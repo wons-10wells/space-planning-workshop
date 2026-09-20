@@ -551,7 +551,7 @@ export default function Home() {
       }
 
       setSubmitState("success");
-      setSubmitMessage("제출이 완료되었습니다. 구글시트에서 새 행을 확인해 주세요.");
+      setSubmitMessage(result.message || "제출이 완료되었습니다. 구글시트에서 새 행을 확인해 주세요.");
     } catch (error) {
       setSubmitState("error");
       setSubmitMessage(

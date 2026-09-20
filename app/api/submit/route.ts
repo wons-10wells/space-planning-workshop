@@ -2,8 +2,6 @@ import { NextResponse } from "next/server";
 
 type SubmissionPayload = {
   form?: Record<string, string>;
-  conceptPrompt?: string;
-  imagePrompt?: string;
   submissionText?: string;
 };
 
@@ -48,14 +46,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        submittedAt: new Date().toISOString(),
-        participantName: form.participantName ?? "",
-        teamName: form.teamName ?? "",
-        organizationName: form.organizationName ?? "",
-        projectName: form.projectName ?? "",
-        form,
-        conceptPrompt: payload.conceptPrompt ?? "",
-        imagePrompt: payload.imagePrompt ?? "",
+        projectName: form.projectName?.trim() || "미정",
         submissionText: payload.submissionText ?? "",
       }),
     });
@@ -75,9 +66,9 @@ export async function POST(request: Request) {
       );
     }
 
-    let result: { ok?: boolean; message?: string };
+    let result: { ok?: boolean; schema?: string; message?: string };
     try {
-      result = JSON.parse(responseText) as { ok?: boolean; message?: string };
+      result = JSON.parse(responseText) as { ok?: boolean; schema?: string; message?: string };
     } catch {
       return NextResponse.json(
         { ok: false, message: "Apps Script가 JSON 대신 오류 페이지를 반환했습니다. 웹 앱 URL과 배포 기록을 확인해 주세요." },
@@ -89,6 +80,12 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { ok: false, message: result.message || `Apps Script 제출에 실패했습니다. (HTTP ${response.status})` },
         { status: 502 },
+      );
+    }
+
+    if (result.schema !== "workshop-three-columns-v1") {
+      return NextResponse.json(
+        { ok: true, message: "제출 요청은 처리됐지만 Apps Script가 이전 형식으로 응답했습니다. 시트의 행을 확인하고 3열용 doPost 코드를 새 버전으로 배포해 주세요." },
       );
     }
 
