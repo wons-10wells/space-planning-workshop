@@ -50,6 +50,7 @@ type FormState = {
 type FieldKey = keyof FormState;
 type StartMode = "materials" | "manual" | null;
 const draftStorageKey = "space-planning-workshop-draft-v1";
+const browserChoiceStorageKey = "space-planning-workshop-browser-choice-v1";
 type ReferenceImage = {
   name: string;
   preview: string;
@@ -456,7 +457,15 @@ export default function Home() {
         : "other";
     const isMobile = platform !== "other" || /Mobile/i.test(userAgent);
     setMobilePlatform(platform);
-    if (isMobile) setBrowserGate("choice");
+    const openedInExternalBrowser = new URL(window.location.href).searchParams.get("external") === "1";
+    let browserChoiceDone = openedInExternalBrowser;
+    try {
+      browserChoiceDone ||= sessionStorage.getItem(browserChoiceStorageKey) === "done";
+      if (openedInExternalBrowser) sessionStorage.setItem(browserChoiceStorageKey, "done");
+    } catch {
+      // The query parameter still prevents a duplicate prompt when storage is unavailable.
+    }
+    if (isMobile && !browserChoiceDone) setBrowserGate("choice");
     try {
       const saved = localStorage.getItem(draftStorageKey);
       if (saved) {
@@ -694,7 +703,7 @@ export default function Home() {
   }
 
   function copyPageLink() {
-    void navigator.clipboard.writeText(window.location.href).then(
+    void navigator.clipboard.writeText(getExternalBrowserUrl()).then(
       () => setLinkMessage("링크를 복사했습니다. 외부 브라우저 주소창에 붙여넣어 주세요."),
       () => setLinkMessage("복사가 차단되었습니다. 카카오톡 메뉴에서 '다른 브라우저로 열기'를 선택해 주세요."),
     );
@@ -703,7 +712,7 @@ export default function Home() {
   async function openBrowserPicker() {
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: "공간기획 프롬프트 워크숍", url: window.location.href });
+        await navigator.share({ title: "공간기획 프롬프트 워크숍", url: getExternalBrowserUrl() });
         setLinkMessage("열 브라우저를 선택해 주세요. 선택 항목에 없다면 아래 안내를 확인하세요.");
         return;
       } catch (error) {
@@ -711,6 +720,21 @@ export default function Home() {
       }
     }
     setBrowserGate("guide");
+  }
+
+  function getExternalBrowserUrl() {
+    const url = new URL(window.location.href);
+    url.searchParams.set("external", "1");
+    return url.toString();
+  }
+
+  function continueInCurrentBrowser() {
+    try {
+      sessionStorage.setItem(browserChoiceStorageKey, "done");
+    } catch {
+      // Closing the dialog still lets the user continue when storage is unavailable.
+    }
+    setBrowserGate(null);
   }
 
   function clearDraft() {
@@ -748,7 +772,7 @@ export default function Home() {
                     <Share2 className="h-4 w-4" />브라우저 선택 메뉴 열기
                   </button>
                   <button type="button" onClick={() => setBrowserGate("guide")} className="min-h-11 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-graphite">선택 메뉴가 열리지 않나요?</button>
-                  <button type="button" onClick={() => setBrowserGate(null)} className="min-h-12 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-ink">
+                  <button type="button" onClick={continueInCurrentBrowser} className="min-h-12 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-ink">
                     현재 화면에서 계속 작성
                   </button>
                 </div>
@@ -767,7 +791,7 @@ export default function Home() {
                   <button type="button" onClick={copyPageLink} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">
                     <Copy className="h-4 w-4" />웹앱 링크 복사
                   </button>
-                  <button type="button" onClick={() => setBrowserGate(null)} className="min-h-12 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-ink">
+                  <button type="button" onClick={continueInCurrentBrowser} className="min-h-12 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-ink">
                     여기서 계속 작성
                   </button>
                 </div>
