@@ -440,11 +440,12 @@ export default function Home() {
   const [imageToolMessage, setImageToolMessage] = useState("");
   const [draftReady, setDraftReady] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
-  const [isKakaoBrowser, setIsKakaoBrowser] = useState(false);
+  const [browserGate, setBrowserGate] = useState<"choice" | "guide" | null>(null);
+  const [linkMessage, setLinkMessage] = useState("");
   const fileNames = materialFiles.map((file) => file.name);
 
   useEffect(() => {
-    setIsKakaoBrowser(/KAKAOTALK/i.test(navigator.userAgent));
+    if (/KAKAOTALK/i.test(navigator.userAgent)) setBrowserGate("choice");
     try {
       const saved = localStorage.getItem(draftStorageKey);
       if (saved) {
@@ -683,8 +684,8 @@ export default function Home() {
 
   function copyPageLink() {
     void navigator.clipboard.writeText(window.location.href).then(
-      () => setImageToolMessage("웹앱 링크를 복사했습니다. Safari, Chrome 또는 Edge 주소창에 붙여넣어 열어 주세요."),
-      () => setImageToolMessage("링크 복사가 차단되었습니다. 브라우저 주소창에서 링크를 복사해 주세요."),
+      () => setLinkMessage("링크를 복사했습니다. 외부 브라우저 주소창에 붙여넣어 주세요."),
+      () => setLinkMessage("복사가 차단되었습니다. 카카오톡 메뉴에서 '다른 브라우저로 열기'를 선택해 주세요."),
     );
   }
 
@@ -707,17 +708,49 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
+      {browserGate ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4">
+          <div role="dialog" aria-modal="true" aria-labelledby="browser-choice-title" className="w-full max-w-md rounded-md bg-white p-5 shadow-xl sm:p-6">
+            <h2 id="browser-choice-title" className="text-xl font-bold text-ink">
+              {browserGate === "choice" ? "어디에서 작성할까요?" : "외부 브라우저에서 열기"}
+            </h2>
+            {browserGate === "choice" ? (
+              <>
+                <p className="mt-3 text-sm leading-6 text-graphite">
+                  지금은 카카오톡 안에서 열렸습니다. Safari, Chrome 또는 Edge에서 작성하면 AI 페이지를 오갈 때 원래 화면으로 돌아오기 쉽습니다.
+                </p>
+                <div className="mt-5 grid gap-2">
+                  <button type="button" onClick={() => setBrowserGate("guide")} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">
+                    <ExternalLink className="h-4 w-4" />외부 브라우저로 여는 방법 보기
+                  </button>
+                  <button type="button" onClick={() => setBrowserGate(null)} className="min-h-12 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-ink">
+                    카카오톡에서 계속 작성
+                  </button>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-graphite">브라우저를 바꾸면 이미 작성한 내용은 자동으로 옮겨지지 않습니다.</p>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-sm leading-6 text-graphite">
+                  카카오톡 화면의 메뉴(⋯)에서 '다른 브라우저로 열기'를 선택해 주세요. 메뉴가 보이지 않으면 링크를 복사해 Safari, Chrome 또는 Edge의 주소창에 붙여넣으세요.
+                </p>
+                <div className="mt-5 grid gap-2">
+                  <button type="button" onClick={copyPageLink} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">
+                    <Copy className="h-4 w-4" />웹앱 링크 복사
+                  </button>
+                  <button type="button" onClick={() => setBrowserGate(null)} className="min-h-12 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-ink">
+                    여기서 계속 작성
+                  </button>
+                </div>
+                {linkMessage ? <p role="status" className="mt-3 text-sm text-moss">{linkMessage}</p> : null}
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
       <section className="border-b border-ink/10 bg-linen/90">
         <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_420px] lg:px-8">
           <div>
-            {isKakaoBrowser ? (
-              <div className="mb-4 border-l-4 border-coral bg-white px-4 py-3 text-sm leading-6 text-graphite">
-                카카오톡 안에서 열렸습니다. 작성 전 카카오톡 메뉴의 '다른 브라우저로 열기'를 선택하거나, 아래 링크를 복사해 Safari, Chrome 또는 Edge에서 열어 주세요. 작성 내용은 브라우저 간에 자동으로 옮겨지지 않습니다.
-                <button type="button" onClick={copyPageLink} className="mt-2 inline-flex items-center gap-2 rounded-md border border-ink/20 bg-white px-3 py-2 font-semibold text-ink">
-                  <Copy className="h-4 w-4" />웹앱 링크 복사
-                </button>
-              </div>
-            ) : null}
             <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-moss/30 bg-white/70 px-3 py-1 text-sm font-semibold text-moss">
               <Sparkles className="h-4 w-4" />
               공간기획 워크숍
