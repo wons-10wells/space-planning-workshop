@@ -14,6 +14,7 @@ import {
   Layers3,
   PencilLine,
   Send,
+  Share2,
   Sparkles,
   UploadCloud,
   WalletCards,
@@ -441,11 +442,21 @@ export default function Home() {
   const [draftReady, setDraftReady] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const [browserGate, setBrowserGate] = useState<"choice" | "guide" | null>(null);
+  const [mobilePlatform, setMobilePlatform] = useState<"ios" | "android" | "other">("other");
   const [linkMessage, setLinkMessage] = useState("");
   const fileNames = materialFiles.map((file) => file.name);
 
   useEffect(() => {
-    if (/KAKAOTALK/i.test(navigator.userAgent)) setBrowserGate("choice");
+    const userAgent = navigator.userAgent;
+    const isIPadOS = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+    const platform = /iPhone|iPad|iPod/i.test(userAgent) || isIPadOS
+      ? "ios"
+      : /Android/i.test(userAgent)
+        ? "android"
+        : "other";
+    const isMobile = platform !== "other" || /Mobile/i.test(userAgent);
+    setMobilePlatform(platform);
+    if (isMobile) setBrowserGate("choice");
     try {
       const saved = localStorage.getItem(draftStorageKey);
       if (saved) {
@@ -689,6 +700,19 @@ export default function Home() {
     );
   }
 
+  async function openBrowserPicker() {
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "공간기획 프롬프트 워크숍", url: window.location.href });
+        setLinkMessage("열 브라우저를 선택해 주세요. 선택 항목에 없다면 아래 안내를 확인하세요.");
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+    setBrowserGate("guide");
+  }
+
   function clearDraft() {
     if (!window.confirm("이 브라우저에 저장된 작성 내용을 지우고 새로 시작할까요?")) return;
     referenceImages.forEach((image) => URL.revokeObjectURL(image.preview));
@@ -717,14 +741,15 @@ export default function Home() {
             {browserGate === "choice" ? (
               <>
                 <p className="mt-3 text-sm leading-6 text-graphite">
-                  지금은 카카오톡 안에서 열렸습니다. Safari, Chrome 또는 Edge에서 작성하면 AI 페이지를 오갈 때 원래 화면으로 돌아오기 쉽습니다.
+                  모바일에서는 Safari, Chrome, Edge 등 독립된 브라우저에서 작성하는 것이 안정적입니다. AI 페이지를 열어도 작성 화면으로 돌아오기 쉽습니다.
                 </p>
                 <div className="mt-5 grid gap-2">
-                  <button type="button" onClick={() => setBrowserGate("guide")} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">
-                    <ExternalLink className="h-4 w-4" />외부 브라우저로 여는 방법 보기
+                  <button type="button" onClick={openBrowserPicker} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">
+                    <Share2 className="h-4 w-4" />브라우저 선택 메뉴 열기
                   </button>
+                  <button type="button" onClick={() => setBrowserGate("guide")} className="min-h-11 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-graphite">선택 메뉴가 열리지 않나요?</button>
                   <button type="button" onClick={() => setBrowserGate(null)} className="min-h-12 rounded-md border border-ink/20 px-4 py-2 text-sm font-semibold text-ink">
-                    카카오톡에서 계속 작성
+                    현재 화면에서 계속 작성
                   </button>
                 </div>
                 <p className="mt-3 text-xs leading-5 text-graphite">브라우저를 바꾸면 이미 작성한 내용은 자동으로 옮겨지지 않습니다.</p>
@@ -732,7 +757,11 @@ export default function Home() {
             ) : (
               <>
                 <p className="mt-3 text-sm leading-6 text-graphite">
-                  카카오톡 화면의 메뉴(⋯)에서 '다른 브라우저로 열기'를 선택해 주세요. 메뉴가 보이지 않으면 링크를 복사해 Safari, Chrome 또는 Edge의 주소창에 붙여넣으세요.
+                  {mobilePlatform === "ios"
+                    ? "공유 메뉴에서 'Safari로 열기' 또는 'Chrome에서 열기'를 선택해 주세요. 항목이 없으면 링크를 복사해 원하는 브라우저 주소창에 붙여넣으세요."
+                    : mobilePlatform === "android"
+                      ? "화면의 메뉴(⋮)에서 '다른 브라우저로 열기' 또는 '브라우저에서 열기'를 선택해 주세요. 항목이 없으면 링크를 복사해 원하는 브라우저 주소창에 붙여넣으세요."
+                      : "공유 또는 메뉴에서 원하는 브라우저로 열어 주세요. 항목이 없으면 링크를 복사해 브라우저 주소창에 붙여넣으세요."}
                 </p>
                 <div className="mt-5 grid gap-2">
                   <button type="button" onClick={copyPageLink} className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white">
