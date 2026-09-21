@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ClipboardEvent, DragEvent, ReactNode } from "react";
 import {
   Building2,
@@ -48,6 +48,7 @@ type FormState = {
 
 type FieldKey = keyof FormState;
 type StartMode = "materials" | "manual" | null;
+const draftStorageKey = "space-planning-workshop-draft-v1";
 type ReferenceImage = {
   name: string;
   preview: string;
@@ -437,7 +438,47 @@ export default function Home() {
   const [geminiState, setGeminiState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [geminiMessage, setGeminiMessage] = useState("");
   const [imageToolMessage, setImageToolMessage] = useState("");
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const [isKakaoBrowser, setIsKakaoBrowser] = useState(false);
   const fileNames = materialFiles.map((file) => file.name);
+
+  useEffect(() => {
+    setIsKakaoBrowser(/KAKAOTALK/i.test(navigator.userAgent));
+    try {
+      const saved = localStorage.getItem(draftStorageKey);
+      if (saved) {
+        const draft = JSON.parse(saved) as Partial<{
+          form: FormState;
+          startMode: StartMode;
+          materialText: string;
+          referenceImageNotes: string;
+        }>;
+        if (draft.form && typeof draft.form === "object") {
+          setForm({ ...initialForm, ...draft.form });
+        }
+        if (draft.startMode === "materials" || draft.startMode === "manual") setStartMode(draft.startMode);
+        if (typeof draft.materialText === "string") setMaterialText(draft.materialText);
+        if (typeof draft.referenceImageNotes === "string") setReferenceImageNotes(draft.referenceImageNotes);
+        setDraftRestored(Boolean(
+          Object.values(draft.form ?? {}).some((value) => typeof value === "string" && value.trim()) ||
+          draft.materialText?.trim() || draft.referenceImageNotes?.trim(),
+        ));
+      }
+    } catch {
+      // Private browsing or disabled storage should not block the worksheet.
+    }
+    setDraftReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!draftReady) return;
+    try {
+      localStorage.setItem(draftStorageKey, JSON.stringify({ form, startMode, materialText, referenceImageNotes }));
+    } catch {
+      // The worksheet remains usable when storage is unavailable.
+    }
+  }, [draftReady, form, startMode, materialText, referenceImageNotes]);
 
   const conceptPrompt = useMemo(() => buildConceptPrompt(form), [form]);
   const imagePrompt = useMemo(() => buildImagePrompt(form), [form]);
@@ -633,15 +674,35 @@ export default function Home() {
     }
   }
 
-  async function openImageTool(url: string, label: string) {
-    try {
-      await navigator.clipboard.writeText(imagePrompt);
-      setImageToolMessage(`${label}가 열립니다. 새 창에서 복사된 요청문을 직접 붙여넣어 주세요.`);
-    } catch {
-      setImageToolMessage(`${label}가 열립니다. 요청문 복사가 막히면 위의 최종 이미지 요청문 복사 버튼을 사용해 주세요.`);
-    }
+  function copyImagePrompt(label: string) {
+    void navigator.clipboard.writeText(imagePrompt).then(
+      () => setImageToolMessage(`${label}가 새 탭에서 열립니다. 요청문을 직접 붙여넣어 주세요. 이 작성 화면은 그대로 유지됩니다.`),
+      () => setImageToolMessage("자동 복사가 차단되었습니다. 위의 최종 이미지 요청문 복사 버튼을 사용해 주세요."),
+    );
+  }
 
-    window.open(url, "_blank", "noopener,noreferrer");
+  function copyPageLink() {
+    void navigator.clipboard.writeText(window.location.href).then(
+      () => setImageToolMessage("웹앱 링크를 복사했습니다. Safari, Chrome 또는 Edge 주소창에 붙여넣어 열어 주세요."),
+      () => setImageToolMessage("링크 복사가 차단되었습니다. 브라우저 주소창에서 링크를 복사해 주세요."),
+    );
+  }
+
+  function clearDraft() {
+    if (!window.confirm("이 브라우저에 저장된 작성 내용을 지우고 새로 시작할까요?")) return;
+    referenceImages.forEach((image) => URL.revokeObjectURL(image.preview));
+    setForm(initialForm);
+    setStartMode(null);
+    setMaterialText("");
+    setMaterialFiles([]);
+    setReferenceImages([]);
+    setReferenceImageNotes("");
+    setDraftRestored(false);
+    try {
+      localStorage.removeItem(draftStorageKey);
+    } catch {
+      // The in-memory worksheet is still cleared if storage is unavailable.
+    }
   }
 
   return (
@@ -649,6 +710,14 @@ export default function Home() {
       <section className="border-b border-ink/10 bg-linen/90">
         <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 sm:px-6 lg:grid-cols-[1fr_420px] lg:px-8">
           <div>
+            {isKakaoBrowser ? (
+              <div className="mb-4 border-l-4 border-coral bg-white px-4 py-3 text-sm leading-6 text-graphite">
+                카카오톡 안에서 열렸습니다. 작성 전 카카오톡 메뉴의 '다른 브라우저로 열기'를 선택하거나, 아래 링크를 복사해 Safari, Chrome 또는 Edge에서 열어 주세요. 작성 내용은 브라우저 간에 자동으로 옮겨지지 않습니다.
+                <button type="button" onClick={copyPageLink} className="mt-2 inline-flex items-center gap-2 rounded-md border border-ink/20 bg-white px-3 py-2 font-semibold text-ink">
+                  <Copy className="h-4 w-4" />웹앱 링크 복사
+                </button>
+              </div>
+            ) : null}
             <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-moss/30 bg-white/70 px-3 py-1 text-sm font-semibold text-moss">
               <Sparkles className="h-4 w-4" />
               공간기획 워크숍
@@ -680,6 +749,8 @@ export default function Home() {
             <div className="text-sm text-graphite">
               필수 정보 {requiredFields.length - missingFields.length}/{requiredFields.length}개 입력됨
             </div>
+            {draftRestored ? <p className="text-xs text-moss">이 브라우저에 저장된 작성 내용을 복원했습니다. 파일은 다시 선택해 주세요.</p> : null}
+            {draftReady ? <button type="button" onClick={clearDraft} className="w-fit text-xs font-semibold text-graphite underline underline-offset-2">새 작성 시작</button> : null}
           </div>
         </div>
       </section>
@@ -1119,25 +1190,29 @@ export default function Home() {
                 {submitState === "submitting" ? "제출 중" : "구글시트에 제출하기"}
               </button>
               <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => openImageTool("https://chatgpt.com/", "챗지피티")}
+                <a
+                  href="https://chatgpt.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => copyImagePrompt("챗지피티")}
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-semibold text-white transition hover:bg-graphite focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2"
                 >
                   <ExternalLink className="h-4 w-4" />
                   챗지피티로 이미지 생성하기
-                </button>
-                <button
-                  type="button"
-                  onClick={() => openImageTool("https://gemini.google.com/", "구글 제미나이")}
+                </a>
+                <a
+                  href="https://gemini.google.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => copyImagePrompt("구글 제미나이")}
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-md bg-moss px-4 text-sm font-semibold text-white transition hover:bg-moss/90 focus:outline-none focus:ring-2 focus:ring-coral focus:ring-offset-2"
                 >
                   <ExternalLink className="h-4 w-4" />
                   구글 제미나이로 이미지 생성하기
-                </button>
+                </a>
               </div>
               <p className="rounded-md bg-fog p-3 text-sm leading-6 text-graphite">
-                버튼을 누르면 최종 이미지 요청문이 복사되고 새 창이 열립니다. 창이 열리면 직접 붙여넣기를 해야 합니다.
+                버튼을 누르면 최종 이미지 요청문이 복사되고 새 탭이 열립니다. 새 탭에서 직접 붙여넣어 주세요. 작성 화면은 이 탭에 남아 있습니다.
               </p>
               {imageToolMessage ? (
                 <p className="rounded-md border border-moss/20 bg-white p-3 text-sm leading-6 text-graphite">
